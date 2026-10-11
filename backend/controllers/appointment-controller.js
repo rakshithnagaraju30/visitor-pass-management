@@ -3,7 +3,9 @@ const Appointment = require('../models/appointment-model');
 // Create Appointment
 const createAppointment = async (req, res) => {
   try {
-    const appointment = await Appointment.create(req.body);
+    const payload = { ...req.body };
+    if (req.user.role !== 'admin') payload.host = req.user._id;
+    const appointment = await Appointment.create(payload);
 
     res.status(201).json({
       message: 'Appointment created successfully',
@@ -22,7 +24,7 @@ const getAppointments = async (req, res) => {
   try {
     const appointments = await Appointment.find()
       .populate('visitor')
-      .populate('host');
+      .populate('host', 'name email role');
 
     res.status(200).json(appointments);
   } catch (error) {
@@ -38,7 +40,7 @@ const getAppointmentById = async (req, res) => {
   try {
     const appointment = await Appointment.findById(req.params.id)
       .populate('visitor')
-      .populate('host');
+      .populate('host', 'name email role');
 
     if (!appointment) {
       return res.status(404).json({

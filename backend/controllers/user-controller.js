@@ -1,109 +1,58 @@
+const bcrypt = require('bcryptjs');
 const User = require('../models/user-model');
 
-// Create User
+const publicUser = (user) => ({
+  _id: user._id,
+  name: user.name,
+  email: user.email,
+  role: user.role,
+  phone: user.phone,
+  createdAt: user.createdAt,
+  updatedAt: user.updatedAt,
+});
+
 const createUser = async (req, res) => {
   try {
-    const user = await User.create(req.body);
-
-    res.status(201).json({
-      message: 'User created successfully',
-      user,
-    });
+    const { name, email, password, role, phone } = req.body;
+    if (!name || !email || !password || !role) return res.status(400).json({ message: 'Name, email, password, and role are required' });
+    if (!['admin', 'security', 'employee'].includes(role)) return res.status(400).json({ message: 'Invalid role' });
+    const normalizedEmail = String(email).trim().toLowerCase();
+    if (await User.exists({ email: normalizedEmail })) return res.status(409).json({ message: 'A user with this email already exists' });
+    const hashedPassword = await bcrypt.hash(password, 12);
+    const user = await User.create({ name: name.trim(), email: normalizedEmail, password: hashedPassword, role, phone });
+    return res.status(201).json({ message: 'User created successfully', user: publicUser(user) });
   } catch (error) {
-    res.status(500).json({
-      message: 'Failed to create user',
-      error: error.message,
-    });
+    return res.status(500).json({ message: 'Failed to create user', error: error.message });
   }
 };
 
-// Get All Users
 const getUsers = async (req, res) => {
-  try {
-    const users = await User.find();
-
-    res.status(200).json(users);
-  } catch (error) {
-    res.status(500).json({
-      message: 'Failed to fetch users',
-      error: error.message,
-    });
-  }
+  try { const users = await User.find().select('-password').sort({ createdAt: -1 }); return res.json(users); }
+  catch (error) { return res.status(500).json({ message: 'Failed to fetch users', error: error.message }); }
 };
-
-// Get User By ID
 const getUserById = async (req, res) => {
   try {
-    const user = await User.findById(req.params.id);
-
-    if (!user) {
-      return res.status(404).json({
-        message: 'User not found',
-      });
-    }
-
-    res.status(200).json(user);
-  } catch (error) {
-    res.status(500).json({
-      message: 'Failed to fetch user',
-      error: error.message,
-    });
-  }
+    const user = await User.findById(req.params.id).select('-password');
+    if (!user) return res.status(404).json({ message: 'User not found' });
+    return res.json(user);
+  } catch (error) { return res.status(400).json({ message: 'Invalid user ID', error: error.message }); }
 };
-
-// Update User
 const updateUser = async (req, res) => {
   try {
-    const user = await User.findByIdAndUpdate(
-      req.params.id,
-      req.body,
-      { new: true }
-    );
-
-    if (!user) {
-      return res.status(404).json({
-        message: 'User not found',
-      });
-    }
-
-    res.status(200).json({
-      message: 'User updated successfully',
-      user,
-    });
-  } catch (error) {
-    res.status(500).json({
-      message: 'Failed to update user',
-      error: error.message,
-    });
-  }
+    const user = await User.findById(req.params.id);
+    if (!user) return res.status(404).json({ message: 'User not found' });
+    for (const key of ['name', 'email', 'phone', 'role']) if (req.body[key] !== undefined) user[key] = req.body[key];
+    if (req.body.password) user.password = await bcrypt.hash(req.body.password, 12);
+    await user.save();
+    return res.json({ message: 'User updated successfully', user: publicUser(user) });
+  } catch (error) { return res.status(400).json({ message: 'Failed to update user', error: error.message }); }
 };
-
-// Delete User
 const deleteUser = async (req, res) => {
   try {
+    if (String(req.params.id) === String(req.user._id)) return res.status(400).json({ message: 'You cannot delete your own account' });
     const user = await User.findByIdAndDelete(req.params.id);
-
-    if (!user) {
-      return res.status(404).json({
-        message: 'User not found',
-      });
-    }
-
-    res.status(200).json({
-      message: 'User deleted successfully',
-    });
-  } catch (error) {
-    res.status(500).json({
-      message: 'Failed to delete user',
-      error: error.message,
-    });
-  }
+    if (!user) return res.status(404).json({ message: 'User not found' });
+    return res.json({ message: 'User deleted successfully' });
+  } catch (error) { return res.status(400).json({ message: 'Failed to delete user', error: error.message }); }
 };
-
-module.exports = {
-  createUser,
-  getUsers,
-  getUserById,
-  deleteUser,
-  updateUser,
-};
+module.exports = { createUser, getUsers, getUserById, updateUser, deleteUser };

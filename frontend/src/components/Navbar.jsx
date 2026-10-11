@@ -8,10 +8,12 @@ const Navbar = () => {
     user = JSON.parse(localStorage.getItem('user') || '{}');
   } catch {
     localStorage.removeItem('user');
+    localStorage.removeItem('token');
   }
 
   const logout = () => {
     localStorage.removeItem('user');
+    localStorage.removeItem('token');
     navigate('/login');
   };
 

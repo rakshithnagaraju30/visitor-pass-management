@@ -1,64 +1,45 @@
 const CheckLog = require('../models/check-log-model');
+const Pass = require('../models/pass-model');
 
-// Create Check Log
 const createCheckLog = async (req, res) => {
   try {
-    const checkLog = await CheckLog.create(req.body);
+    const { pass: passIdentifier, action } = req.body;
+    if (!passIdentifier || !['check-in', 'check-out'].includes(action)) {
+      return res.status(400).json({ message: 'A pass ID and valid action (check-in/check-out) are required' });
+    }
+    const isObjectId = /^[0-9a-fA-F]{24}$/.test(String(passIdentifier));
+    const pass = isObjectId
+      ? await Pass.findById(passIdentifier)
+      : await Pass.findOne({ passNumber: String(passIdentifier) });
+    if (!pass) return res.status(404).json({ message: 'Pass not found' });
+    if (pass.status !== 'active') return res.status(400).json({ message: `This pass is ${pass.status} and cannot be used` });
+    const now = new Date();
+    if (now < pass.validFrom || now > pass.validUntil) return res.status(400).json({ message: 'Pass is outside its validity period' });
+    const lastLog = await CheckLog.findOne({ pass: pass._id }).sort({ timestamp: -1 });
+    if (action === 'check-in' && lastLog?.action === 'check-in') return res.status(409).json({ message: 'This pass is already checked in' });
+    if (action === 'check-out' && (!lastLog || lastLog.action !== 'check-in')) return res.status(409).json({ message: 'A check-in is required before check-out' });
 
-    res.status(201).json({
-      message: 'Check log created successfully',
-      checkLog,
-    });
+    const checkLog = await CheckLog.create({ visitor: pass.visitor, pass: pass._id, action, scannedBy: req.user._id, timestamp: now });
+    if (action === 'check-out') {
+      pass.status = 'used';
+      await pass.save();
+    }
+    return res.status(201).json({ message: `${action} recorded successfully`, checkLog });
   } catch (error) {
-    res.status(500).json({
-      message: 'Failed to create check log',
-      error: error.message,
-    });
+    return res.status(400).json({ message: 'Failed to record check log', error: error.message });
   }
 };
-
-// Get All Check Logs
 const getCheckLogs = async (req, res) => {
   try {
-    const checkLogs = await CheckLog.find()
-      .populate('visitor')
-      .populate('pass')
-      .populate('scannedBy');
-
-    res.status(200).json(checkLogs);
-  } catch (error) {
-    res.status(500).json({
-      message: 'Failed to fetch check logs',
-      error: error.message,
-    });
-  }
+    const checkLogs = await CheckLog.find().populate('visitor').populate('pass').populate('scannedBy', '-password').sort({ timestamp: -1 });
+    return res.json(checkLogs);
+  } catch (error) { return res.status(500).json({ message: 'Failed to fetch check logs', error: error.message }); }
 };
-
-// Get Check Log By ID
 const getCheckLogById = async (req, res) => {
   try {
-    const checkLog = await CheckLog.findById(req.params.id)
-      .populate('visitor')
-      .populate('pass')
-      .populate('scannedBy');
-
-    if (!checkLog) {
-      return res.status(404).json({
-        message: 'Check log not found',
-      });
-    }
-
-    res.status(200).json(checkLog);
-  } catch (error) {
-    res.status(500).json({
-      message: 'Failed to fetch check log',
-      error: error.message,
-    });
-  }
+    const checkLog = await CheckLog.findById(req.params.id).populate('visitor').populate('pass').populate('scannedBy', '-password');
+    if (!checkLog) return res.status(404).json({ message: 'Check log not found' });
+    return res.json(checkLog);
+  } catch (error) { return res.status(400).json({ message: 'Invalid check log ID', error: error.message }); }
 };
-
-module.exports = {
-  createCheckLog,
-  getCheckLogs,
-  getCheckLogById,
-};
+module.exports = { createCheckLog, getCheckLogs, getCheckLogById };

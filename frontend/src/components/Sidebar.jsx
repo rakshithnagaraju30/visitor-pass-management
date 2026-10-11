@@ -20,13 +20,13 @@ const Sidebar = () => {
       </div>
       <nav>
         <Link className={isActive('/dashboard')} to="/dashboard">Dashboard</Link>
-        {(user.role === 'admin' || user.role === 'security') && (
+        {(user.role === 'admin' || user.role === 'security' || user.role === 'employee') && (
           <Link className={isActive('/visitors')} to="/visitors">Visitors</Link>
         )}
         {(user.role === 'admin' || user.role === 'employee') && (
           <Link className={isActive('/appointments')} to="/appointments">Appointments</Link>
         )}
-        {(user.role === 'admin' || user.role === 'security') && (
+        {(user.role === 'admin' || user.role === 'security' || user.role === 'employee') && (
           <Link className={isActive('/passes')} to="/passes">Passes</Link>
         )}
         {(user.role === 'admin' || user.role === 'security') && (

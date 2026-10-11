@@ -26,8 +26,8 @@ const Layout = ({ children }) => (
   </div>
 );
 
-const ProtectedPage = ({ children }) => (
-  <ProtectedRoute><Layout>{children}</Layout></ProtectedRoute>
+const ProtectedPage = ({ children, roles }) => (
+  <ProtectedRoute roles={roles}><Layout>{children}</Layout></ProtectedRoute>
 );
 
 const App = () => (
@@ -36,11 +36,11 @@ const App = () => (
       <Route path="/login" element={<Login />} />
       <Route path="/" element={<Navigate to="/dashboard" replace />} />
       <Route path="/dashboard" element={<ProtectedPage><Dashboard /></ProtectedPage>} />
-      <Route path="/users" element={<ProtectedPage><Users /></ProtectedPage>} />
+      <Route path="/users" element={<ProtectedPage roles={['admin']}><Users /></ProtectedPage>} />
       <Route path="/visitors" element={<ProtectedPage><Visitors /></ProtectedPage>} />
       <Route path="/appointments" element={<ProtectedPage><Appointments /></ProtectedPage>} />
       <Route path="/passes" element={<ProtectedPage><Passes /></ProtectedPage>} />
-      <Route path="/check-logs" element={<ProtectedPage><CheckLogs /></ProtectedPage>} />
+      <Route path="/check-logs" element={<ProtectedPage roles={['admin', 'security']}><CheckLogs /></ProtectedPage>} />
       <Route path="/profile" element={<ProtectedPage><Profile /></ProtectedPage>} />
       <Route path="*" element={<Navigate to="/dashboard" replace />} />
     </Routes>

@@ -39,6 +39,11 @@ const passSchema = new mongoose.Schema(
       enum: ['active', 'used', 'expired', 'revoked'],
       default: 'active',
     },
+    emailStatus: {
+      type: String,
+      enum: ['pending', 'sent', 'failed', 'not_configured', 'skipped_no_email'],
+      default: 'pending',
+    },
     issuedBy: {
       type: mongoose.Schema.Types.ObjectId,
       ref: 'User',
