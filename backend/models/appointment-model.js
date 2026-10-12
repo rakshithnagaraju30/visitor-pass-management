@@ -2,6 +2,11 @@ const mongoose = require('mongoose');
 
 const appointmentSchema = new mongoose.Schema(
   {
+    organizationId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'Organization',
+      index: true,
+    },
     visitor: {
       type: mongoose.Schema.Types.ObjectId,
       ref: 'Visitor',

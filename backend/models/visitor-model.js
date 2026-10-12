@@ -2,6 +2,11 @@ const mongoose = require('mongoose');
 
 const visitorSchema = new mongoose.Schema(
   {
+    organizationId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'Organization',
+      index: true,
+    },
     name: {
       type: String,
       required: true,

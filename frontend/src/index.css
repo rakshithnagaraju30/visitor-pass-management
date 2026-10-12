@@ -109,6 +109,100 @@ img {
 }
 
 /* =========================================
+   PUBLIC HOME PAGE
+========================================= */
+
+.home-page {
+  min-height: 100vh;
+  padding: 72px 8vw;
+  background: linear-gradient(135deg, #eff6ff 0%, #fff 58%, #ecfdf5 100%);
+}
+
+.home-content {
+  max-width: 760px;
+  padding-top: 8vh;
+}
+
+.home-eyebrow {
+  margin-bottom: 14px;
+  color: var(--primary);
+  font-size: 18px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.home-content h1 {
+  max-width: 720px;
+  margin-bottom: 20px;
+  color: #111827;
+  font-size: clamp(38px, 7vw, 72px);
+  line-height: 1.05;
+}
+
+.home-description {
+  max-width: 600px;
+  margin-bottom: 32px;
+  color: var(--muted);
+  font-size: clamp(17px, 2vw, 21px);
+}
+
+.home-actions {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 14px;
+}
+
+.home-primary-action,
+.home-secondary-action {
+  display: inline-block;
+  padding: 12px 20px;
+  border-radius: 8px;
+  font-weight: 600;
+  text-decoration: none;
+}
+
+.home-primary-action {
+  background: var(--primary);
+  color: #fff;
+}
+
+.home-primary-action:hover {
+  background: var(--primary-dark);
+}
+
+.home-secondary-action {
+  color: var(--primary);
+}
+
+.home-features {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 18px;
+  max-width: 1000px;
+  margin-top: 96px;
+}
+
+.home-features article {
+  padding: 22px;
+  border: 1px solid rgba(229, 231, 235, 0.9);
+  border-radius: var(--radius);
+  background: rgba(255, 255, 255, 0.8);
+  box-shadow: var(--shadow);
+}
+
+.home-features h2 {
+  margin-bottom: 8px;
+  font-size: 18px;
+}
+
+.home-features p {
+  color: var(--muted);
+  font-size: 14px;
+}
+
+/* =========================================
    MAIN APPLICATION LAYOUT
 ========================================= */
 
@@ -468,6 +562,12 @@ td button {
   margin-top: 6px;
 }
 
+.auth-switch {
+  margin-top: 18px;
+  text-align: center;
+  font-size: 14px;
+}
+
 /* =========================================
    VISITOR PASS / QR / STATUS MESSAGES
 ========================================= */
@@ -557,6 +657,19 @@ td button {
 ========================================= */
 
 @media (max-width: 768px) {
+  .home-page {
+    padding: 40px 20px;
+  }
+
+  .home-content {
+    padding-top: 5vh;
+  }
+
+  .home-features {
+    grid-template-columns: 1fr;
+    margin-top: 64px;
+  }
+
   .app-layout {
     display: flex;
     flex-direction: column;

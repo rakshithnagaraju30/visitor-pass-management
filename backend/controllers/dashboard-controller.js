@@ -5,12 +5,13 @@ const CheckLog = require('../models/check-log-model');
 
 const getDashboardStats = async (req, res) => {
   try {
+    const organizationId = req.organizationId;
     const [visitors, appointments, activePasses, checkLogs, pendingAppointments] = await Promise.all([
-      Visitor.countDocuments(),
-      Appointment.countDocuments(),
-      Pass.countDocuments({ status: 'active' }),
-      CheckLog.countDocuments(),
-      Appointment.countDocuments({ status: 'pending' }),
+      Visitor.countDocuments({ organizationId }),
+      Appointment.countDocuments({ organizationId }),
+      Pass.countDocuments({ organizationId, status: 'active' }),
+      CheckLog.countDocuments({ organizationId }),
+      Appointment.countDocuments({ organizationId, status: 'pending' }),
     ]);
     return res.json({ visitors, appointments, activePasses, checkLogs, pendingAppointments });
   } catch (error) {

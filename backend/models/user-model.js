@@ -4,7 +4,7 @@ const userSchema = new mongoose.Schema(
   {
     name: {
       type: String,
-      required: true,
+      required: false,
     },
     email: {
       type: String,
@@ -24,6 +24,14 @@ const userSchema = new mongoose.Schema(
       type: String,
       required: false,
     },
+    
+    organizationId: {
+      type: require("mongoose").Schema.Types.ObjectId,
+      ref: "Organization",
+      required: true,
+      index: true,
+    },
+
   },
 
   {

@@ -1,6 +1,6 @@
-import { useNavigate } from 'react-router-dom';
+  import { useNavigate } from 'react-router-dom';
 
-const Navbar = () => {
+  const Navbar = () => {
   const navigate = useNavigate();
   let user = {};
 
@@ -9,12 +9,13 @@ const Navbar = () => {
   } catch {
     localStorage.removeItem('user');
     localStorage.removeItem('token');
+    localStorage.removeItem('organization');
   }
 
   const logout = () => {
     localStorage.removeItem('user');
     localStorage.removeItem('token');
-    navigate('/login');
+    navigate('/', { replace: true });
   };
 
   return (

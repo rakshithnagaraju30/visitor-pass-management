@@ -7,7 +7,7 @@ const { createPassPdfBuffer } = require('../services/pass-document-service');
 // Get All Passes
 const getPasses = async (req, res) => {
   try {
-    const passes = await Pass.find()
+    const passes = await Pass.find({ organizationId: req.organizationId })
       .populate('visitor')
       .populate('appointment')
       .populate('issuedBy', 'name email role');
@@ -24,7 +24,7 @@ const getPasses = async (req, res) => {
 // Get Pass By ID
 const getPassById = async (req, res) => {
   try {
-    const pass = await Pass.findById(req.params.id)
+    const pass = await Pass.findOne({ _id: req.params.id, organizationId: req.organizationId })
       .populate('visitor')
       .populate('appointment')
       .populate('issuedBy', 'name email role');
@@ -49,12 +49,15 @@ const getPassPdf = async (req, res) => {
   try {
     const isObjectId = /^[0-9a-fA-F]{24}$/.test(req.params.id);
     const pass = isObjectId
-      ? await Pass.findById(req.params.id)
-      : await Pass.findOne({ passNumber: req.params.id });
+      ? await Pass.findOne({ _id: req.params.id, organizationId: req.organizationId })
+      : await Pass.findOne({ passNumber: req.params.id, organizationId: req.organizationId });
     if (!pass) return res.status(404).json({ message: 'Pass not found' });
-    const [visitor, appointment] = await Promise.all([Visitor.findById(pass.visitor), Appointment.findById(pass.appointment)]);
+    const [visitor, appointment] = await Promise.all([
+      Visitor.findOne({ _id: pass.visitor, organizationId: req.organizationId }),
+      Appointment.findOne({ _id: pass.appointment, organizationId: req.organizationId }),
+    ]);
     if (!visitor || !appointment) return res.status(404).json({ message: 'Pass details are incomplete' });
-    const host = await User.findById(appointment.host);
+    const host = await User.findOne({ _id: appointment.host, organizationId: req.organizationId });
     const pdf = await createPassPdfBuffer(pass, visitor, appointment, host);
     res.setHeader('Content-Type', 'application/pdf');
     res.setHeader('Content-Disposition', `attachment; filename=\"${pass.passNumber}.pdf\"`);
@@ -70,8 +73,8 @@ const updatePassStatus = async (req, res) => {
     if (!['active', 'used', 'expired', 'revoked'].includes(req.body.status)) {
       return res.status(400).json({ message: 'Invalid pass status' });
     }
-    const pass = await Pass.findByIdAndUpdate(
-      req.params.id,
+    const pass = await Pass.findOneAndUpdate(
+      { _id: req.params.id, organizationId: req.organizationId },
       { status: req.body.status },
       { new: true }
     );

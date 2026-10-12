@@ -1,9 +1,10 @@
 import { render, screen } from '@testing-library/react';
 import App from './App';
 
-test('renders the login page for unauthenticated users', () => {
+test('renders the home page for unauthenticated users', () => {
   localStorage.removeItem('user');
+  localStorage.removeItem('token');
   render(<App />);
-  expect(screen.getByText('VisitorPass')).toBeInTheDocument();
-  expect(screen.getByRole('button', { name: 'Login' })).toBeInTheDocument();
+  expect(screen.getByText('Manage every visit with confidence.')).toBeInTheDocument();
+  expect(screen.getByRole('link', { name: 'Sign in to continue' })).toHaveAttribute('href', '/login');
 });

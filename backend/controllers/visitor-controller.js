@@ -3,7 +3,8 @@ const Visitor = require('../models/visitor-model');
 // Create Visitor
 const createVisitor = async (req, res) => {
   try {
-    const visitor = await Visitor.create(req.body);
+    const { name, email, phone, photo } = req.body;
+    const visitor = await Visitor.create({ name, email, phone, photo, organizationId: req.organizationId });
 
     res.status(201).json({
       message: 'Visitor registered successfully',
@@ -20,7 +21,7 @@ const createVisitor = async (req, res) => {
 // Get All Visitors
 const getVisitors = async (req, res) => {
   try {
-    const visitors = await Visitor.find();
+    const visitors = await Visitor.find({ organizationId: req.organizationId });
 
     res.status(200).json(visitors);
   } catch (error) {
@@ -34,7 +35,7 @@ const getVisitors = async (req, res) => {
 // Get Visitor By ID
 const getVisitorById = async (req, res) => {
   try {
-    const visitor = await Visitor.findById(req.params.id);
+    const visitor = await Visitor.findOne({ _id: req.params.id, organizationId: req.organizationId });
 
     if (!visitor) {
       return res.status(404).json({
@@ -54,9 +55,10 @@ const getVisitorById = async (req, res) => {
 // Update Visitor
 const updateVisitor = async (req, res) => {
   try {
-    const visitor = await Visitor.findByIdAndUpdate(
-      req.params.id,
-      req.body,
+    const { name, email, phone, photo } = req.body;
+    const visitor = await Visitor.findOneAndUpdate(
+      { _id: req.params.id, organizationId: req.organizationId },
+      { name, email, phone, photo },
       { new: true }
     );
 

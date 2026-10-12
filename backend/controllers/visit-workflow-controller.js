@@ -11,6 +11,7 @@ const registerAndIssue = async (req, res) => {
   let createdAppointment = null;
   let createdPass = null;
   try {
+    // Validate and normalize the visitor and appointment input.
     const { visitor: visitorInput, appointment: appointmentInput } = req.body;
     if (!visitorInput || !appointmentInput) {
       return res.status(400).json({ message: 'visitor and appointment objects are required' });
@@ -31,16 +32,17 @@ const registerAndIssue = async (req, res) => {
 
     let visitor;
     if (visitorInput.existingVisitorId) {
+      // Use the selected visitor profile when an existing ID is provided.
       if (!mongoose.isValidObjectId(visitorInput.existingVisitorId)) return res.status(400).json({ message: 'Invalid existing visitor ID' });
-      visitor = await Visitor.findById(visitorInput.existingVisitorId);
+      visitor = await Visitor.findOne({ _id: visitorInput.existingVisitorId, organizationId: req.organizationId });
       if (!visitor) return res.status(404).json({ message: 'Selected visitor was not found' });
     } else {
       // Reuse an existing visitor by phone or email to avoid duplicate profiles.
       const criteria = [{ phone }];
       if (email) criteria.push({ email });
-      visitor = await Visitor.findOne({ $or: criteria });
+      visitor = await Visitor.findOne({ organizationId: req.organizationId, $or: criteria });
       if (!visitor) {
-        visitor = await Visitor.create({ name, phone, email: email || undefined, photo: visitorInput.photo || undefined });
+        visitor = await Visitor.create({ organizationId: req.organizationId, name, phone, email: email || undefined, photo: visitorInput.photo || undefined });
         createdVisitor = visitor;
       } else {
         // Keep existing profile but refresh the fields the employee supplied.
@@ -51,12 +53,14 @@ const registerAndIssue = async (req, res) => {
       }
     }
 
-    const host = await User.findById(req.user._id);
+    const host = await User.findOne({ _id: req.user._id, organizationId: req.organizationId });
     if (!host) return res.status(401).json({ message: 'Logged-in employee account was not found' });
 
+    // Create an approved appointment for the authenticated employee.
     // Employees may invite/approve visitors per the assignment; authorized staff can issue the pass in this workflow.
     createdAppointment = await Appointment.create({
       visitor: visitor._id,
+      organizationId: req.organizationId,
       host: host._id,
       purpose,
       appointmentDate,
@@ -74,8 +78,10 @@ const registerAndIssue = async (req, res) => {
     const QRCode = require('qrcode');
     const qrPayload = JSON.stringify({ passNumber, appointmentId: String(createdAppointment._id) });
     const qrCode = await QRCode.toDataURL(qrPayload, { errorCorrectionLevel: 'M', margin: 1, width: 280 });
+    // Store the active pass and track the email delivery status.
     createdPass = await Pass.create({
       visitor: visitor._id,
+      organizationId: req.organizationId,
       appointment: createdAppointment._id,
       passNumber,
       qrCode,
@@ -89,6 +95,7 @@ const registerAndIssue = async (req, res) => {
 
     let emailResult;
     try {
+      // Email delivery is best-effort and must not block pass issuance.
       emailResult = await sendVisitorPassEmail({ pass: createdPass, visitor, appointment: createdAppointment, host });
     } catch (emailError) {
       emailResult = { status: 'failed', message: emailError.message };
@@ -104,10 +111,10 @@ const registerAndIssue = async (req, res) => {
       email: emailResult,
     });
   } catch (error) {
-    // Best-effort cleanup prevents orphan records if creation fails mid-workflow.
-    if (createdPass) await Pass.findByIdAndDelete(createdPass._id).catch(() => {});
-    if (createdAppointment) await Appointment.findByIdAndDelete(createdAppointment._id).catch(() => {});
-    if (createdVisitor) await Visitor.findByIdAndDelete(createdVisitor._id).catch(() => {});
+    // Remove records created during a partially failed workflow.
+    if (createdPass) await Pass.findOneAndDelete({ _id: createdPass._id, organizationId: req.organizationId }).catch(() => {});
+    if (createdAppointment) await Appointment.findOneAndDelete({ _id: createdAppointment._id, organizationId: req.organizationId }).catch(() => {});
+    if (createdVisitor) await Visitor.findOneAndDelete({ _id: createdVisitor._id, organizationId: req.organizationId }).catch(() => {});
     return res.status(500).json({ message: 'Could not complete visitor registration and pass issuance', error: error.message });
   }
 };

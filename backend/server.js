@@ -7,6 +7,7 @@ const { requireAuth, allowRoles } = require('./middleware/auth-middleware');
 const { setServers } = require("node:dns");
 setServers(["8.8.8.8", "1.1.1.1"]);
 
+const organizationRoutes = require("./routes/organization-routes");
 const authRoutes = require('./routes/auth-route');
 const userRoutes = require('./routes/user-route');
 const visitorRoutes = require('./routes/visitor-route');
@@ -22,6 +23,7 @@ app.use(cors({ origin: allowedOrigins }));
 app.use(express.json({ limit: '2mb' }));
 app.get('/api/health', (req, res) => res.json({ status: 'ok' }));
 app.use('/api/auth', authRoutes);
+app.use('/api/organizations', organizationRoutes);
 app.use('/api/users', requireAuth, allowRoles('admin'), userRoutes);
 app.use('/api/visitors', requireAuth, allowRoles('admin', 'employee', 'security'), visitorRoutes);
 app.use('/api/appointments', requireAuth, allowRoles('admin', 'employee', 'security'), appointmentRoutes);
