@@ -4,11 +4,11 @@ import { Link, useNavigate } from 'react-router-dom';
 
 export const Logo = ({ to = '/', inverted = false }) => (
   <Link to={to} className="inline-flex items-center gap-2.5">
-    <span className="inline-flex h-8 w-8 items-center justify-center rounded-lg bg-brand-600 text-white">
-      <svg viewBox="0 0 24 24" className="h-[18px] w-[18px]" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-        <path d="m6 12 4 4 8-8" />
-      </svg>
-    </span>
+    <img
+      src={`${process.env.PUBLIC_URL}/logo.png`}
+      alt=""
+      className="h-9 w-9 rounded-lg object-cover shadow-sm ring-1 ring-black/5"
+    />
     <span className={`text-lg font-bold tracking-tight ${inverted ? 'text-white' : 'text-ink'}`}>VisitorPass</span>
   </Link>
 );
