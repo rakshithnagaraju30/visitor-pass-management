@@ -1,0 +1,53 @@
+# Full stack: MongoDB + Express API + React app served by Nginx.
+#   cp backend/.env.example backend/.env   (set JWT_SECRET, SMTP, ...)
+#   docker compose up -d --build
+# The app is then available at http://localhost (or http://localhost:${HTTP_PORT}).
+
+services:
+  mongo:
+    image: mongo:7
+    # Single-node replica set: organization registration uses MongoDB transactions,
+    # which a standalone server does not support
+    command: ["--replSet", "rs0", "--bind_ip_all"]
+    restart: unless-stopped
+    volumes:
+      - mongo-data:/data/db
+    healthcheck:
+      # Initiates the replica set on first start, then reports healthy once this node is primary
+      test:
+        - CMD
+        - mongosh
+        - --quiet
+        - --eval
+        - "try { rs.status() } catch (e) { rs.initiate({ _id: 'rs0', members: [{ _id: 0, host: 'mongo:27017' }] }) } quit(db.hello().isWritablePrimary ? 0 : 1)"
+      interval: 10s
+      timeout: 10s
+      retries: 12
+      start_period: 20s
+
+  backend:
+    build: ./backend
+    restart: unless-stopped
+    env_file:
+      - ./backend/.env
+    environment:
+      # These override backend/.env so the containers talk to each other
+      URL: mongodb://mongo:27017/visitor_pass_management?replicaSet=rs0
+      PORT: "4000"
+      NODE_ENV: production
+      FRONTEND_URL: ${PUBLIC_URL:-http://localhost}
+    depends_on:
+      mongo:
+        condition: service_healthy
+
+  frontend:
+    build: ./frontend
+    restart: unless-stopped
+    ports:
+      - "${HTTP_PORT:-80}:80"
+    depends_on:
+      backend:
+        condition: service_healthy
+
+volumes:
+  mongo-data:

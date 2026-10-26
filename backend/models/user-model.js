@@ -18,17 +18,24 @@ const userSchema = new mongoose.Schema(
     role: {
       type: String,
       required: true,
-      enum: ['admin', 'security', 'employee'],
+      enum: ['admin', 'security', 'employee', 'visitor'],
     },
     phone: {
       type: String,
       required: false,
     },
-    
+    // Visitors must confirm their email with an OTP; accounts created before OTP have no value and stay usable
+    emailVerified: {
+      type: Boolean,
+      required: false,
+    },
+
     organizationId: {
       type: require("mongoose").Schema.Types.ObjectId,
       ref: "Organization",
-      required: true,
+      required: function () {
+        return this.role !== 'visitor';
+      },
       index: true,
     },
 

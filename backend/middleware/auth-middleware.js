@@ -10,9 +10,17 @@ const requireAuth = async (req, res, next) => {
     if (!process.env.JWT_SECRET) return res.status(500).json({ message: 'JWT_SECRET is not configured' });
 
     const payload = jwt.verify(token, process.env.JWT_SECRET);
-    if (!payload.organizationId) return res.status(401).json({ message: 'Invalid authentication token' });
-    const user = await User.findOne({ _id: payload.userId, organizationId: payload.organizationId }).select('-password');
+    const userQuery = payload.role === 'visitor'
+      ? { _id: payload.userId, role: 'visitor' }
+      : { _id: payload.userId, organizationId: payload.organizationId };
+    if (payload.role !== 'visitor' && !payload.organizationId) return res.status(401).json({ message: 'Invalid authentication token' });
+    const user = await User.findOne(userQuery).select('-password');
     if (!user) return res.status(401).json({ message: 'Account no longer exists' });
+    if (user.role === 'visitor') {
+      req.user = user;
+      next();
+      return;
+    }
     const organization = await Organization.findById(user.organizationId).select('status');
     if (!organization || organization.status !== 'active') return res.status(403).json({ message: 'This organization is inactive or suspended' });
     req.organizationId = user.organizationId;
@@ -30,4 +38,50 @@ const allowRoles = (...roles) => (req, res, next) => {
   next();
 };
 
-module.exports = { requireAuth, allowRoles };
+const authMiddleware = async (req, res, next) => {
+  try {
+    const authHeader = req.headers.authorization;
+
+    if (!authHeader || !authHeader.startsWith('Bearer ')) {
+      return res.status(401).json({
+        message: 'Authentication required',
+      });
+    }
+
+    const token = authHeader.split(' ')[1];
+
+    const decoded = jwt.verify(
+      token,
+      process.env.JWT_SECRET
+    );
+
+    const user = await User.findById(decoded.userId).select(
+      '-password'
+    );
+
+    if (!user) {
+      return res.status(401).json({
+        message: 'User not found',
+      });
+    }
+
+    req.user = user;
+
+    // Multi-organization support
+    req.organizationId = user.organizationId;
+
+    if (!req.organizationId && user.role !== 'visitor') {
+      return res.status(403).json({
+        message: 'User is not associated with an organization',
+      });
+    }
+
+    next();
+  } catch (error) {
+    return res.status(401).json({
+      message: 'Invalid or expired token',
+    });
+  }
+};
+
+module.exports = { requireAuth, allowRoles, authMiddleware };

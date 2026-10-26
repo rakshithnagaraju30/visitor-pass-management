@@ -18,7 +18,10 @@ const workflowRoutes = require('./routes/visit-workflow-route');
 const dashboardRoutes = require('./routes/dashboard-route');
 
 const app = express();
-const allowedOrigins = (process.env.FRONTEND_URL || 'http://localhost:3000/').split(',').map((origin) => origin.trim());
+// Running behind Nginx in Docker; trust the first proxy hop for client IPs
+app.set('trust proxy', 1);
+// Browsers send origins without a trailing slash, so strip any from the configured list
+const allowedOrigins = (process.env.FRONTEND_URL || 'http://localhost:3000').split(',').map((origin) => origin.trim().replace(/\/+$/, ''));
 app.use(cors({ origin: allowedOrigins }));
 app.use(express.json({ limit: '2mb' }));
 app.get('/api/health', (req, res) => res.json({ status: 'ok' }));
@@ -26,7 +29,7 @@ app.use('/api/auth', authRoutes);
 app.use('/api/organizations', organizationRoutes);
 app.use('/api/users', requireAuth, allowRoles('admin'), userRoutes);
 app.use('/api/visitors', requireAuth, allowRoles('admin', 'employee', 'security'), visitorRoutes);
-app.use('/api/appointments', requireAuth, allowRoles('admin', 'employee', 'security'), appointmentRoutes);
+app.use('/api/appointments', appointmentRoutes);
 app.use('/api/passes', requireAuth, allowRoles('admin', 'employee', 'security'), passRoutes);
 app.use('/api/check-logs', requireAuth, allowRoles('admin', 'security'), checkLogRoutes);
 app.use('/api/visits', workflowRoutes);

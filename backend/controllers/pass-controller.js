@@ -3,14 +3,32 @@ const Visitor = require('../models/visitor-model');
 const Appointment = require('../models/appointment-model');
 const User = require('../models/user-model');
 const { createPassPdfBuffer } = require('../services/pass-document-service');
+const { searchRegex, dateRangeFilter } = require('../utils/list-filters');
 
-// Get All Passes
+const PASS_STATUSES = ['active', 'used', 'expired', 'revoked'];
+
+// Get All Passes (supports ?search=&status=&from=&to= on the validity start date)
 const getPasses = async (req, res) => {
   try {
-    const passes = await Pass.find({ organizationId: req.organizationId })
+    const { search, status, from, to } = req.query;
+    const filter = { organizationId: req.organizationId, ...dateRangeFilter('validFrom', from, to) };
+    if (PASS_STATUSES.includes(status)) filter.status = status;
+
+    const regex = searchRegex(search);
+    if (regex) {
+      // Search matches the pass number or the visitor's name, email or phone
+      const visitors = await Visitor.find({
+        organizationId: req.organizationId,
+        $or: [{ name: regex }, { email: regex }, { phone: regex }],
+      }).select('_id');
+      filter.$or = [{ passNumber: regex }, { visitor: { $in: visitors.map((visitor) => visitor._id) } }];
+    }
+
+    const passes = await Pass.find(filter)
       .populate('visitor')
       .populate('appointment')
-      .populate('issuedBy', 'name email role');
+      .populate('issuedBy', 'name email role')
+      .sort({ validFrom: -1 });
 
     res.status(200).json(passes);
   } catch (error) {
@@ -70,7 +88,7 @@ const getPassPdf = async (req, res) => {
 // Update Pass Status
 const updatePassStatus = async (req, res) => {
   try {
-    if (!['active', 'used', 'expired', 'revoked'].includes(req.body.status)) {
+    if (!PASS_STATUSES.includes(req.body.status)) {
       return res.status(400).json({ message: 'Invalid pass status' });
     }
     const pass = await Pass.findOneAndUpdate(

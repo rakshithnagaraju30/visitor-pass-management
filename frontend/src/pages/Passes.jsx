@@ -1,63 +1,91 @@
-import { useEffect, useState } from 'react';
-import api from '../services/api';
+import { useState } from 'react';
+import api, { downloadPdf } from '../services/api';
+import FilterBar from '../components/FilterBar';
+import useFilteredList from '../hooks/useFilteredList';
+import { Alert, EmptyRow, PageHeader, StatusBadge } from '../components/ui';
 
-const emptyForm = { visitor: '', appointment: '', passNumber: '', qrCode: '', pdfUrl: '', validFrom: '', validUntil: '', issuedBy: '' };
+const PASS_STATUSES = ['active', 'used', 'expired', 'revoked'];
 
 const Passes = () => {
-  const [passes, setPasses] = useState([]);
-  const [form, setForm] = useState(emptyForm);
+  const { items: passes, filters, setFilter, resetFilters, isFiltered, loading, error, reload } =
+    useFilteredList('/passes', { search: '', status: '', from: '', to: '' });
+  const [actionError, setActionError] = useState('');
+  const user = JSON.parse(localStorage.getItem('user') || '{}');
+  const canRevoke = ['admin', 'security'].includes(user.role);
 
-  const fetchPasses = async () => {
+  const handleDownload = async (pass) => {
+    setActionError('');
     try {
-      const response = await api.get('/passes');
-      setPasses(response.data);
-    } catch (error) {
-      window.alert(error.response?.data?.message || 'Failed to load passes');
+      await downloadPdf(`/passes/${pass._id}/pdf`, `${pass.passNumber}.pdf`);
+    } catch {
+      setActionError('Unable to download the PDF pass');
     }
   };
 
-  useEffect(() => { fetchPasses(); }, []);
-  const handleChange = (event) => setForm({ ...form, [event.target.name]: event.target.value });
-
-  const createPass = async (event) => {
-    event.preventDefault();
+  const handleRevoke = async (pass) => {
+    if (!window.confirm(`Revoke pass ${pass.passNumber}? It can no longer be used for check-in.`)) return;
+    setActionError('');
     try {
-      await api.post('/passes', form);
-      window.alert('Pass issued successfully');
-      setForm(emptyForm);
-      fetchPasses();
-    } catch (error) {
-      window.alert(error.response?.data?.message || 'Failed to issue pass');
+      await api.put(`/passes/${pass._id}/status`, { status: 'revoked' });
+      await reload();
+    } catch (err) {
+      setActionError(err.response?.data?.message || 'Failed to revoke pass');
     }
   };
 
   return (
-    <div>
-      <h1>Passes</h1>
-      <div className="form-card">
-        <h2>Issue Pass</h2>
-        <form onSubmit={createPass}>
-          <input name="visitor" placeholder="Visitor ID" value={form.visitor} onChange={handleChange} required />
-          <input name="appointment" placeholder="Appointment ID" value={form.appointment} onChange={handleChange} required />
-          <input name="passNumber" placeholder="Pass Number" value={form.passNumber} onChange={handleChange} required />
-          <input name="qrCode" placeholder="QR Code data" value={form.qrCode} onChange={handleChange} required />
-          <input name="pdfUrl" placeholder="PDF URL" value={form.pdfUrl} onChange={handleChange} />
-          <label htmlFor="validFrom">Valid From</label>
-          <input id="validFrom" name="validFrom" type="datetime-local" value={form.validFrom} onChange={handleChange} required />
-          <label htmlFor="validUntil">Valid Until</label>
-          <input id="validUntil" name="validUntil" type="datetime-local" value={form.validUntil} onChange={handleChange} required />
-          <input name="issuedBy" placeholder="Issued By User ID" value={form.issuedBy} onChange={handleChange} required />
-          <button type="submit">Issue Pass</button>
-        </form>
-      </div>
-      <div className="table-card">
-        <h2>Issued Passes</h2>
-        <table>
-          <thead><tr><th>Pass Number</th><th>Visitor</th><th>Status</th><th>Valid Until</th></tr></thead>
-          <tbody>{passes.map((pass) => (
-            <tr key={pass._id}><td>{pass.passNumber}</td><td>{pass.visitor?.name || pass.visitor}</td><td>{pass.status}</td><td>{pass.validUntil}</td></tr>
-          ))}</tbody>
-        </table>
+    <div className="space-y-6">
+      <PageHeader
+        title="Passes"
+        description="Passes are issued from Visitors (register & issue) or when a visitor request is approved."
+      />
+
+      <Alert>{actionError}</Alert>
+
+      <div className="card overflow-hidden">
+        <div className="card-header">
+          <h2 className="card-title">Issued passes</h2>
+        </div>
+        <FilterBar
+          filters={filters}
+          onChange={setFilter}
+          onReset={resetFilters}
+          isFiltered={isFiltered}
+          searchPlaceholder="Search pass number or visitor"
+          statusOptions={PASS_STATUSES}
+          dateLabel="Valid"
+          resultCount={loading ? undefined : passes.length}
+        />
+        {error && <div className="p-5"><Alert>{error}</Alert></div>}
+        <div className="table-wrap">
+          <table className="data-table">
+            <thead>
+              <tr><th>Pass number</th><th>Visitor</th><th>Status</th><th>Valid from</th><th>Valid until</th><th className="text-right">Action</th></tr>
+            </thead>
+            <tbody>
+              {passes.map((pass) => (
+                <tr key={pass._id}>
+                  <td className="font-mono text-xs font-semibold text-ink">{pass.passNumber}</td>
+                  <td className="font-medium text-ink">{pass.visitor?.name || pass.visitor}</td>
+                  <td><StatusBadge status={pass.status} /></td>
+                  <td>{new Date(pass.validFrom).toLocaleString()}</td>
+                  <td>{new Date(pass.validUntil).toLocaleString()}</td>
+                  <td className="text-right">
+                    <div className="inline-flex gap-2">
+                      <button type="button" className="btn btn-secondary btn-sm" onClick={() => handleDownload(pass)}>PDF</button>
+                      {canRevoke && pass.status === 'active' && (
+                        <button type="button" className="btn btn-danger-outline btn-sm" onClick={() => handleRevoke(pass)}>Revoke</button>
+                      )}
+                    </div>
+                  </td>
+                </tr>
+              ))}
+              {!loading && passes.length === 0 && (
+                <EmptyRow colSpan={6}>{isFiltered ? 'No passes match these filters.' : 'No passes issued yet.'}</EmptyRow>
+              )}
+            </tbody>
+          </table>
+        </div>
       </div>
     </div>
   );

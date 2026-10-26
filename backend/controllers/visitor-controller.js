@@ -1,4 +1,5 @@
 const Visitor = require('../models/visitor-model');
+const { searchRegex, dateRangeFilter } = require('../utils/list-filters');
 
 // Create Visitor
 const createVisitor = async (req, res) => {
@@ -18,10 +19,14 @@ const createVisitor = async (req, res) => {
   }
 };
 
-// Get All Visitors
+// Get All Visitors (supports ?search=&from=&to= on registration date)
 const getVisitors = async (req, res) => {
   try {
-    const visitors = await Visitor.find({ organizationId: req.organizationId });
+    const { search, from, to } = req.query;
+    const filter = { organizationId: req.organizationId, ...dateRangeFilter('createdAt', from, to) };
+    const regex = searchRegex(search);
+    if (regex) filter.$or = [{ name: regex }, { email: regex }, { phone: regex }];
+    const visitors = await Visitor.find(filter).sort({ createdAt: -1 });
 
     res.status(200).json(visitors);
   } catch (error) {

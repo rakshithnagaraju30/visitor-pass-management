@@ -167,4 +167,22 @@ const registerOrganization = async (req, res) => {
   }
 };
 
-module.exports = { registerOrganization };
+const getPublicOrganizations = async (req, res) => {
+  try {
+    const organizations = await Organization.find({
+      status: "active",
+    })
+      .select("_id name type")
+      .sort({ name: 1 });
+
+    res.json(organizations);
+  } catch (error) {
+    console.error("Public organization fetch error:", error);
+
+    res.status(500).json({
+      message: "Unable to fetch organizations",
+    });
+  }
+};
+
+module.exports = { registerOrganization, getPublicOrganizations };

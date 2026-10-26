@@ -1,10 +1,9 @@
-const crypto = require('crypto');
 const mongoose = require('mongoose');
 const Visitor = require('../models/visitor-model');
 const Appointment = require('../models/appointment-model');
 const Pass = require('../models/pass-model');
 const User = require('../models/user-model');
-const { sendVisitorPassEmail } = require('../services/email-service');
+const { issuePassForAppointment } = require('../services/pass-issuance-service');
 
 const registerAndIssue = async (req, res) => {
   let createdVisitor = null;
@@ -68,47 +67,15 @@ const registerAndIssue = async (req, res) => {
       status: 'approved',
     });
 
-    const passNumber = `VPM-${Date.now().toString(36).toUpperCase()}-${crypto.randomBytes(3).toString('hex').toUpperCase()}`;
-    const validFrom = new Date(appointmentDate);
-    const validUntil = new Date(appointmentDate);
-    const [hours, minutes] = appointmentTime.split(':').map(Number);
-    if (Number.isFinite(hours) && Number.isFinite(minutes)) validFrom.setHours(hours, minutes, 0, 0);
-    validUntil.setTime(validFrom.getTime() + 8 * 60 * 60 * 1000);
-
-    const QRCode = require('qrcode');
-    const qrPayload = JSON.stringify({ passNumber, appointmentId: String(createdAppointment._id) });
-    const qrCode = await QRCode.toDataURL(qrPayload, { errorCorrectionLevel: 'M', margin: 1, width: 280 });
-    // Store the active pass and track the email delivery status.
-    createdPass = await Pass.create({
-      visitor: visitor._id,
-      organizationId: req.organizationId,
-      appointment: createdAppointment._id,
-      passNumber,
-      qrCode,
-      pdfUrl: `/api/passes/${passNumber}/pdf`,
-      validFrom,
-      validUntil,
-      status: 'active',
-      issuedBy: host._id,
-      emailStatus: 'pending',
-    });
-
-    let emailResult;
-    try {
-      // Email delivery is best-effort and must not block pass issuance.
-      emailResult = await sendVisitorPassEmail({ pass: createdPass, visitor, appointment: createdAppointment, host });
-    } catch (emailError) {
-      emailResult = { status: 'failed', message: emailError.message };
-    }
-    createdPass.emailStatus = emailResult.status;
-    await createdPass.save();
+    const issued = await issuePassForAppointment({ appointment: createdAppointment, visitor, host, organizationId: req.organizationId });
+    createdPass = issued.pass;
 
     return res.status(201).json({
       message: 'Visitor registered, appointment created, and pass issued',
       visitor,
       appointment: createdAppointment,
       pass: createdPass,
-      email: emailResult,
+      email: issued.email,
     });
   } catch (error) {
     // Remove records created during a partially failed workflow.
@@ -119,4 +86,73 @@ const registerAndIssue = async (req, res) => {
   }
 };
 
-module.exports = { registerAndIssue };
+// Approve a pending (usually visitor-requested) appointment and issue its pass.
+const approveVisitorAppointment = async (req, res) => {
+  try {
+    const appointment = await Appointment.findOne({
+      _id: req.params.id,
+      organizationId: req.organizationId,
+      status: 'pending',
+    });
+
+    if (!appointment) {
+      return res.status(404).json({ message: 'Pending appointment not found' });
+    }
+
+    const visitor = await Visitor.findOne({ _id: appointment.visitor, organizationId: req.organizationId });
+    if (!visitor) return res.status(404).json({ message: 'Visitor for this appointment was not found' });
+
+    // Visitor-requested appointments have no host yet; the approving staff member becomes the host
+    if (!appointment.host) appointment.host = req.user._id;
+    const host = await User.findOne({ _id: appointment.host, organizationId: req.organizationId });
+    if (!host) return res.status(400).json({ message: 'The appointment host was not found' });
+
+    appointment.status = 'approved';
+    await appointment.save();
+
+    let issued;
+    try {
+      issued = await issuePassForAppointment({ appointment, visitor, host, organizationId: req.organizationId });
+    } catch (error) {
+      // Keep the request reviewable if the pass could not be generated
+      appointment.status = 'pending';
+      await appointment.save().catch(() => {});
+      throw error;
+    }
+
+    return res.status(200).json({
+      message: 'Appointment approved and visitor pass generated',
+      appointment,
+      pass: issued.pass,
+      email: issued.email,
+    });
+  } catch (error) {
+    console.error('Approve appointment error:', error);
+    return res.status(500).json({ message: 'Unable to approve appointment' });
+  }
+};
+
+const rejectVisitorAppointment = async (req, res) => {
+  try {
+    const appointment = await Appointment.findOne({
+      _id: req.params.id,
+      organizationId: req.organizationId,
+      status: 'pending',
+    });
+
+    if (!appointment) {
+      return res.status(404).json({ message: 'Pending appointment not found' });
+    }
+
+    appointment.status = 'rejected';
+    appointment.rejectionReason = String(req.body.rejectionReason || '').trim() || 'Appointment rejected';
+    await appointment.save();
+
+    return res.status(200).json({ message: 'Appointment rejected successfully', appointment });
+  } catch (error) {
+    console.error('Reject visitor appointment error:', error);
+    return res.status(500).json({ message: 'Unable to reject appointment' });
+  }
+};
+
+module.exports = { registerAndIssue, approveVisitorAppointment, rejectVisitorAppointment };

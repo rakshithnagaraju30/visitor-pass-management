@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import api from '../services/api';
+import { Alert, AuthLayout, Field } from '../components/ui';
 
 const RegisterOrganization = () => {
   const navigate = useNavigate();
@@ -34,33 +35,39 @@ const RegisterOrganization = () => {
   };
 
   return (
-    <div className="login-page">
-      <div className="login-card">
-        <h1>Create your organization</h1>
-        <p>Set up your VisitorPass workspace and administrator account.</p>
-        <form onSubmit={handleSubmit}>
-          <label htmlFor="organizationName">Organization name</label>
-          <input id="organizationName" name="organizationName" value={form.organizationName} onChange={handleChange} required />
-          <label htmlFor="organizationType">Organization type</label>
-          <select id="organizationType" name="organizationType" value={form.organizationType} onChange={handleChange}>
+    <AuthLayout
+      title="Create your organization"
+      subtitle="Set up your VisitorPass workspace and administrator account."
+      footer={<>Already have an account? <Link to="/login" className="link">Sign in</Link></>}
+    >
+      <form onSubmit={handleSubmit} className="space-y-4">
+        <Field id="organizationName" label="Organization name">
+          <input id="organizationName" name="organizationName" className="input" placeholder="ABC Public School" value={form.organizationName} onChange={handleChange} required />
+        </Field>
+        <Field id="organizationType" label="Organization type">
+          <select id="organizationType" name="organizationType" className="input" value={form.organizationType} onChange={handleChange}>
             <option value="school">School</option>
             <option value="office">Office</option>
             <option value="government">Government</option>
             <option value="hospital">Hospital</option>
             <option value="other">Other</option>
           </select>
-          <label htmlFor="name">Administrator name</label>
-          <input id="name" name="name" value={form.name} onChange={handleChange} required />
-          <label htmlFor="email">Administrator email</label>
-          <input id="email" name="email" type="email" value={form.email} onChange={handleChange} autoComplete="username" required />
-          <label htmlFor="password">Password</label>
-          <input id="password" name="password" type="password" minLength="8" value={form.password} onChange={handleChange} autoComplete="new-password" required />
-          {error && <p className="error-message">{error}</p>}
-          <button type="submit" disabled={loading}>{loading ? 'Creating...' : 'Create organization'}</button>
-        </form>
-        <p className="auth-switch">Already have an account? <Link to="/login">Sign in</Link></p>
-      </div>
-    </div>
+        </Field>
+        <Field id="name" label="Administrator name">
+          <input id="name" name="name" className="input" value={form.name} onChange={handleChange} required />
+        </Field>
+        <Field id="email" label="Administrator email">
+          <input id="email" name="email" type="email" className="input" value={form.email} onChange={handleChange} autoComplete="username" required />
+        </Field>
+        <Field id="password" label="Password" hint="At least 8 characters.">
+          <input id="password" name="password" type="password" className="input" minLength="8" value={form.password} onChange={handleChange} autoComplete="new-password" required />
+        </Field>
+        <Alert>{error}</Alert>
+        <button type="submit" className="btn btn-primary w-full" disabled={loading}>
+          {loading ? 'Creating...' : 'Create organization'}
+        </button>
+      </form>
+    </AuthLayout>
   );
 };
 

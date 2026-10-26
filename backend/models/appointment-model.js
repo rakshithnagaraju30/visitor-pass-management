@@ -15,7 +15,8 @@ const appointmentSchema = new mongoose.Schema(
     host: {
       type: mongoose.Schema.Types.ObjectId,
       ref: 'User',
-      required: true,
+      // Visitor-requested appointments have no host until staff assign one
+      required: false,
     },
     purpose: {
       type: String,
@@ -29,6 +30,11 @@ const appointmentSchema = new mongoose.Schema(
       type: String,
       required: true,
     },
+    rejectionReason:{
+      type: String,
+      default: "",
+    },
+
     status: {
       type: String,
       required: false,

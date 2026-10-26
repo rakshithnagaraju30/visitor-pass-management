@@ -1,5 +1,8 @@
 const CheckLog = require('../models/check-log-model');
 const Pass = require('../models/pass-model');
+const Visitor = require('../models/visitor-model');
+const Appointment = require('../models/appointment-model');
+const { searchRegex, dateRangeFilter } = require('../utils/list-filters');
 
 const createCheckLog = async (req, res) => {
   try {
@@ -23,15 +26,32 @@ const createCheckLog = async (req, res) => {
     if (action === 'check-out') {
       pass.status = 'used';
       await pass.save();
+      // The visit is over, so the appointment can no longer be cancelled
+      await Appointment.updateOne({ _id: pass.appointment, organizationId: req.organizationId, status: 'approved' }, { status: 'completed' });
     }
     return res.status(201).json({ message: `${action} recorded successfully`, checkLog });
   } catch (error) {
     return res.status(400).json({ message: 'Failed to record check log', error: error.message });
   }
 };
+// Supports ?search=&action=&from=&to=
 const getCheckLogs = async (req, res) => {
   try {
-    const checkLogs = await CheckLog.find({ organizationId: req.organizationId }).populate('visitor').populate('pass').populate('scannedBy', '-password').sort({ timestamp: -1 });
+    const { search, action, from, to } = req.query;
+    const filter = { organizationId: req.organizationId, ...dateRangeFilter('timestamp', from, to) };
+    if (['check-in', 'check-out'].includes(action)) filter.action = action;
+
+    const regex = searchRegex(search);
+    if (regex) {
+      // Search matches the visitor's name, email or phone, or the pass number
+      const [visitors, passes] = await Promise.all([
+        Visitor.find({ organizationId: req.organizationId, $or: [{ name: regex }, { email: regex }, { phone: regex }] }).select('_id'),
+        Pass.find({ organizationId: req.organizationId, passNumber: regex }).select('_id'),
+      ]);
+      filter.$or = [{ visitor: { $in: visitors.map((visitor) => visitor._id) } }, { pass: { $in: passes.map((pass) => pass._id) } }];
+    }
+
+    const checkLogs = await CheckLog.find(filter).populate('visitor').populate('pass').populate('scannedBy', '-password').sort({ timestamp: -1 });
     return res.json(checkLogs);
   } catch (error) { return res.status(500).json({ message: 'Failed to fetch check logs', error: error.message }); }
 };
